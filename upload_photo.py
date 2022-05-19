@@ -26,7 +26,15 @@ class VkBackup:
         res = requests.get(user_info_url, params={**self.param_vk, **user_info_param}).json()
         return res['response'][0]['id']
 
-    def __get_photo_list(self, count=5, album_id='profile'):
+    def account_app_permissions(self):
+        url = self.host_vk + 'account.getAppPermissions'
+        params = {
+            'user_id': self.__user_id()
+        }
+        response = requests.get(url, params={**self.param_vk, **params}).json()
+        return response
+
+    def get_photo_list(self, count=5, album_id='profile'):
         photo_list_url = self.host_vk + 'photos.get'
         photo_list_param = {
             'owner_id': self.__user_id(),
@@ -35,11 +43,21 @@ class VkBackup:
             'photo_sizes': '1',
             'count': count
         }
-        res = requests.get(photo_list_url, params={**self.param_vk, **photo_list_param}).json().get('response')
-        return res
+        response = requests.get(photo_list_url,
+                                params={**self.param_vk, **photo_list_param}).json().get('response')
+        return response
 
-    def get_query_to_copy(self, count=5):
-        user_photo = self.__get_photo_list(count)['items']
+    def photos_albums(self):
+        album_list_url = self.host_vk + 'photos.getAlbums'
+        album_list_params = {
+            'owner_id': self.__user_id(),
+            'photo_sizes': '1'
+        }
+        response = requests.get(album_list_url, params={**self.param_vk, **album_list_params}).json().get('response')
+        return response
+
+    def get_query_to_copy(self, count=5, album='profile'):
+        user_photo = self.get_photo_list(count, album)['items']
         return user_photo
 
 
@@ -72,17 +90,26 @@ class YaUploader:
         res = requests.get(url, headers=headers)
         return res.status_code
 
-    def __create_folder(self, path_folder):
+    def __create_folder(self, path_folder, album_id):
         url = f'{self.host_ya}/v1/disk/resources'
         params = {
             'path': path_folder,
             'fields': 'href'
         }
-        requests.put(url, params=params, headers=self.header).json()
+        response = requests.get(url, params=params, headers=self.header).status_code
+        if response == 404:
+            requests.put(url, params=params, headers=self.header)
+        else:
+            params = {
+                'path': f'{path_folder}/{album_id}',
+                'fields': 'href'
+            }
+            requests.put(url, params=params, headers=self.header)
 
-    def upload(self, path, name_file, url_photo, size):
+    def upload(self, path, name_file, url_photo, size, album_id):
         """
         Запрос загрузки файлов
+        :param album_id:
         :param path: Путь созданной папки для загрузки файлов
         :param name_file: Название файла
         :param url_photo: url файла
@@ -90,22 +117,23 @@ class YaUploader:
         :return: Возврат json-файла с информацией по файлам
         """
         url = f'{self.host_ya}/v1/disk/resources/upload'
-        self.__create_folder(path)
+        self.__create_folder(path, album_id)
         params = {
-            'path': f'{path}/{name_file}.jpg',
+            'path': f'{path}/{album_id}/{name_file}.jpg',
             'url': url_photo,
         }
         requests.post(url, headers=self.header, params=params)
         self.info_dict['file_name'] = f'{name_file}.jpg'
         self.info_dict['size'] = size
         self.to_join.append(self.info_dict.copy())
-        with open(f'load_{path}.json', 'w') as f:
+        with open(f'{"info/"}load_{path}_{album_id}.json', 'w') as f:
             json.dump(self.to_join, f, ensure_ascii=False, indent=0)
 
 
-def get_to_copy(ids, token, count=5):
+def get_to_copy(ids, token, count, album_id='profile'):
     """
     Копирование файлов
+    :param album_id:
     :param ids: ID VK user
     :param token: Token API Yandex
     :param count: Количество запросов для скачивания
@@ -113,17 +141,36 @@ def get_to_copy(ids, token, count=5):
     """
     user_vk = VkBackup(ids)
     disk_user = YaUploader(token)
-    user_copy = user_vk.get_query_to_copy(count)
+    user_copy = user_vk.get_query_to_copy(count, album_id)
+    # user_photo_list = user_vk.get_photo_list(count, album_id)
+    # pprint(user_photo_list)
     check_counter = []
     if disk_user.check_path() == 200:
         for el in tqdm(user_copy):
             if el['likes']['count'] not in check_counter:
-                disk_user.upload(ids, el['likes']['count'], el['sizes'][-1]['url'], el['sizes'][-1]['type'])
+                disk_user.upload(ids, el['likes']['count'], el['sizes'][-1]['url'], el['sizes'][-1]['type'], album_id)
                 check_counter.append(el['likes']['count'])
             else:
-                disk_user.upload(ids, el['date'], el['sizes'][-1]['url'], el['sizes'][-1]['type'])
+                disk_user.upload(ids, el['date'], el['sizes'][-1]['url'], el['sizes'][-1]['type'], album_id)
             time.sleep(.5)
         del check_counter
         print('Загрузка завершена')
     else:
         print(f'Код ошибки {disk_user.check_path()}')
+    # pprint(user_copy)
+
+
+def get_album_select(ids):
+    user_vk = VkBackup(ids)
+    album_dict = {
+        'id': None,
+        'title': None
+    }
+    to_album = []
+    res = user_vk.photos_albums()
+    for item in res['items']:
+        if item['size'] != 0:
+            album_dict['id'] = item['id']
+            album_dict['title'] = item['title']
+            to_album.append(album_dict.copy())
+    return to_album
