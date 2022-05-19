@@ -2,7 +2,7 @@ import requests
 import time
 import json
 from tqdm import tqdm
-from pprint import pprint
+
 
 with open('token_vk.txt', 'r') as file_vk:
     token_vk = file_vk.read().strip()
@@ -142,8 +142,6 @@ def get_to_copy(ids, token, count, album_id='profile'):
     user_vk = VkBackup(ids)
     disk_user = YaUploader(token)
     user_copy = user_vk.get_query_to_copy(count, album_id)
-    # user_photo_list = user_vk.get_photo_list(count, album_id)
-    # pprint(user_photo_list)
     check_counter = []
     if disk_user.check_path() == 200:
         for el in tqdm(user_copy):
@@ -157,7 +155,6 @@ def get_to_copy(ids, token, count, album_id='profile'):
         print('Загрузка завершена')
     else:
         print(f'Код ошибки {disk_user.check_path()}')
-    # pprint(user_copy)
 
 
 def get_album_select(ids):

@@ -4,23 +4,20 @@ from upload_photo import get_album_select
 from pprint import pprint
 
 if __name__ == '__main__':
-    # name_user = input('ID VK user: ')       # Запрос ID пользователя
-    # token_yandex = getpass('Токен Яндекс: ')
+    name_user = input('ID VK user: ')       # Запрос ID пользователя
+    token_yandex = getpass('Токен Яндекс: ')
     album_ids = {
         '1': 'wall',
         '2': 'profile',
         '3': 'saved',
         '4': 'album_user'
     }
-    name_user = 'haritonova_love'
-    token_yandex = 'AQAAAAACeEDqAADLW_r2MRLqXEoYhzq0WLwtM9o'
     choice_user = input(f'Какой альбом выбрать\n'
                         f'1| -- фото стены\n'
                         f'2| -- фото профиля\n'
                         f'3| -- сохраненные фото\n'
                         f'4| -- альбомы\n')
     if choice_user in '123':
-        # pprint(album_ids[choice_user])
         try:
             num_photos = int(input('Количество фото (по умолчанию 5): '))
         except ValueError:
